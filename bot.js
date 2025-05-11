@@ -25,7 +25,7 @@ bot.on('photo', async (ctx) => {
     const response = await axios({ url, responseType: 'arraybuffer' });
     const image = await Jimp.read(response.data);
 
-    const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
+    const font = await Jimp.loadFont(Jimp.FONT_SANS_64_WHITE);
 
     // Watermark settings
     const watermarkText = '@Sky_Hub4u'; // Change this to your watermark
