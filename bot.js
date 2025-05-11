@@ -5,7 +5,6 @@ const axios = require('axios');
 // Replace with your bot token
 const bot = new Telegraf('7861502352:AAHUujFPIjeyzVhJb0ANTeWm-S6kcVWXLds');
 
-// Store user settings in memory
 let userSettings = {};
 
 function getUserSettings(userId) {
@@ -21,12 +20,10 @@ function getUserSettings(userId) {
   return userSettings[userId];
 }
 
-// /start command
 bot.start((ctx) => {
   ctx.reply('Welcome! Send an image to get it watermarked.\nUse /settings to customize font, size, and position.');
 });
 
-// /settings command
 bot.command('settings', (ctx) => {
   const settings = getUserSettings(ctx.from.id);
   const message = `Settings:\nFont Size: ${settings.fontSize}\nFont Color: ${settings.fontColor}\nFont Style: ${settings.fontStyle.replace('FONT_SANS_', '')}\nPosition: ${settings.position}`;
@@ -42,7 +39,6 @@ bot.command('settings', (ctx) => {
   });
 });
 
-// Font size selection
 bot.action('font_size', (ctx) => {
   ctx.editMessageText('Select Font Size:', {
     reply_markup: {
@@ -66,7 +62,6 @@ bot.action('font_size', (ctx) => {
   });
 });
 
-// Handle set_size buttons
 bot.action(/^set_size_(\d+)$/, (ctx) => {
   const size = parseInt(ctx.match[1]);
   getUserSettings(ctx.from.id).fontSize = size;
@@ -74,7 +69,6 @@ bot.action(/^set_size_(\d+)$/, (ctx) => {
   ctx.answerCbQuery();
 });
 
-// Font color
 bot.action('font_color', (ctx) => {
   ctx.editMessageText('Choose Font Color:', {
     reply_markup: {
@@ -93,7 +87,6 @@ bot.action(/^color_(.+)/, (ctx) => {
   ctx.answerCbQuery();
 });
 
-// Font style
 bot.action('font_style', (ctx) => {
   ctx.editMessageText('Choose Font Style:', {
     reply_markup: {
@@ -112,7 +105,6 @@ bot.action(/^font_(.+)/, (ctx) => {
   ctx.answerCbQuery();
 });
 
-// Watermark position
 bot.action('position', (ctx) => {
   ctx.editMessageText('Choose Watermark Position:', {
     reply_markup: {
@@ -131,7 +123,6 @@ bot.action(/^pos_(.+)/, (ctx) => {
   ctx.answerCbQuery();
 });
 
-// Handle photo with watermark
 bot.on('photo', async (ctx) => {
   const userId = ctx.from.id;
   const settings = getUserSettings(userId);
@@ -141,18 +132,12 @@ bot.on('photo', async (ctx) => {
   try {
     const file = ctx.message.photo[ctx.message.photo.length - 1];
     const fileUrl = await ctx.telegram.getFileLink(file.file_id);
-
     const response = await axios.get(fileUrl.href, { responseType: 'arraybuffer' });
+
     const image = await Jimp.read(response.data);
 
-    const fontMap = {
-      'WHITE': 'WHITE',
-      'BLACK': 'BLACK',
-      'RED': 'RED',
-    };
-
-    const size = Math.max(8, Math.min(settings.fontSize, 128)); // Limit to Jimp sizes
-    let fontKey = `FONT_SANS_${size}_${fontMap[settings.fontColor] || 'WHITE'}`;
+    const size = Math.max(8, Math.min(settings.fontSize, 128));
+    const fontKey = `FONT_SANS_${size}_WHITE`;
 
     let font;
     try {
@@ -161,7 +146,7 @@ bot.on('photo', async (ctx) => {
       font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
     }
 
-    const text = settings.text || '@Sky_Hub4u';
+    const text = settings.text || 'Watermark';
     const textWidth = Jimp.measureText(font, text);
     const textHeight = Jimp.measureTextHeight(font, text, image.bitmap.width);
 
@@ -175,18 +160,19 @@ bot.on('photo', async (ctx) => {
       y = image.bitmap.height - textHeight - 10;
     }
 
+    const watermarkBackground = new Jimp(textWidth + 20, textHeight + 20, '#000000');
+    image.composite(watermarkBackground, x - 10, y - 10);
+
     image.print(font, x, y, text);
 
     const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
-
     await ctx.deleteMessage(waitMsg.message_id);
-    await ctx.replyWithPhoto({ source: buffer }, { caption: '✅ Watermark added!' });
+    await ctx.replyWithPhoto({ source: buffer }, { caption: '✅ Watermark added with black background.' });
 
   } catch (err) {
     console.error(err);
-    await ctx.reply('❌ Failed to process image.');
+    ctx.reply('❌ Failed to process image.');
   }
 });
 
-// Start the bot
 bot.launch();
