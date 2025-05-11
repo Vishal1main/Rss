@@ -1,72 +1,109 @@
 const { Telegraf } = require('telegraf');
-const axios = require('axios');
 const Jimp = require('jimp');
-const fs = require('fs');
-const express = require('express');
+const axios = require('axios');
 
-const BOT_TOKEN = '7861502352:AAHUujFPIjeyzVhJb0ANTeWm-S6kcVWXLds'; // Replace with your actual token
-const bot = new Telegraf(BOT_TOKEN);
+// Bot token, replace with your bot's token
+const bot = new Telegraf('7861502352:AAHUujFPIjeyzVhJb0ANTeWm-S6kcVWXLds');
 
-const userSettings = {}; // Store settings per user
+// User settings in memory (you may want to use a database instead of in-memory storage)
+let userSettings = {};
 
-// Set default settings
+// Function to get user settings
 function getUserSettings(userId) {
   if (!userSettings[userId]) {
-    userSettings[userId] = {
-      text: 'YourWatermark',
-      fontSize: 32,
-      fontColor: 'WHITE',
-      position: 'RIGHT'
+    userSettings[userId] = { 
+      text: 'Watermark', 
+      fontSize: 32, 
+      fontColor: 'WHITE', 
+      fontStyle: 'FONT_SANS', 
+      position: 'left'
     };
   }
   return userSettings[userId];
 }
 
-// /start
-bot.start((ctx) => {
-  ctx.reply('Welcome! Send me a landscape poster and I’ll add a watermark.\nUse /settings to customize.');
-});
-
-// /settings command
-bot.command('settings', (ctx) => {
-  showSettingsMenu(ctx);
-});
-
+// Show settings menu
 function showSettingsMenu(ctx) {
-  ctx.reply('Choose what you want to change:', {
+  const settings = getUserSettings(ctx.from.id);
+  const text = `Settings Menu:\nWatermark Text: ${settings.text}\nFont Size: ${settings.fontSize}\nFont Color: ${settings.fontColor}\nPosition: ${settings.position}`;
+  
+  ctx.reply(text, {
     reply_markup: {
       inline_keyboard: [
         [{ text: 'Watermark Text', callback_data: 'change_text' }],
-        [{ text: 'Font Size', callback_data: 'change_font_size' }],
-        [{ text: 'Font Color', callback_data: 'change_font_color' }],
-        [{ text: 'Watermark Position', callback_data: 'change_position' }],
+        [{ text: 'Font Size', callback_data: 'change_size' }],
+        [{ text: 'Font Color', callback_data: 'change_color' }],
+        [{ text: 'Font Style', callback_data: 'change_font_style' }],
+        [{ text: 'Position', callback_data: 'change_position' }]
       ]
     }
   });
 }
 
-// Handlers for each setting
+// Handle /settings command
+bot.command('settings', (ctx) => {
+  showSettingsMenu(ctx);
+});
+
+// Handle button actions
 bot.action('change_text', (ctx) => {
-  ctx.reply('Send new watermark text:');
   ctx.session = { awaiting: 'text' };
+  ctx.editMessageText('Send new watermark text:');
   ctx.answerCbQuery();
 });
 
-bot.action('change_font_size', (ctx) => {
-  ctx.reply('Send new font size (e.g. 32, 64, 128):');
+bot.action('change_size', (ctx) => {
   ctx.session = { awaiting: 'size' };
+  ctx.editMessageText('Send new font size (e.g. 32):');
   ctx.answerCbQuery();
 });
 
-bot.action('change_font_color', (ctx) => {
-  ctx.reply('Choose font color:', {
+bot.action('change_color', (ctx) => {
+  ctx.editMessageText('Choose font color:', {
     reply_markup: {
       inline_keyboard: [
-        [{ text: 'WHITE', callback_data: 'color_WHITE' }, { text: 'BLACK', callback_data: 'color_BLACK' }],
-        [{ text: 'RED', callback_data: 'color_RED' }, { text: 'BLUE', callback_data: 'color_BLUE' }]
+        [{ text: 'White', callback_data: 'color_WHITE' }],
+        [{ text: 'Black', callback_data: 'color_BLACK' }],
+        [{ text: 'Red', callback_data: 'color_RED' }]
       ]
     }
   });
+  ctx.answerCbQuery();
+});
+
+bot.action('change_font_style', (ctx) => {
+  ctx.editMessageText('Choose font style:', {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Normal', callback_data: 'font_FONT_SANS' }],
+        [{ text: 'Bold', callback_data: 'font_FONT_SANS_BOLD' }],
+        [{ text: 'Italic', callback_data: 'font_FONT_SANS_ITALIC' }]
+      ]
+    }
+  });
+  ctx.answerCbQuery();
+});
+
+bot.action('change_position', (ctx) => {
+  ctx.editMessageText('Choose watermark position:', {
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: 'Left', callback_data: 'position_left' }],
+        [{ text: 'Center', callback_data: 'position_center' }],
+        [{ text: 'Right', callback_data: 'position_right' }]
+      ]
+    }
+  });
+  ctx.answerCbQuery();
+});
+
+// Update user settings based on action
+bot.action(/^font_(.+)/, (ctx) => {
+  const userId = ctx.from.id;
+  const font = ctx.match[1];
+  getUserSettings(userId).fontStyle = font;
+  ctx.reply(`✅ Font style set to ${font.replace('FONT_SANS_', '')}`);
+  showSettingsMenu(ctx);
   ctx.answerCbQuery();
 });
 
@@ -74,32 +111,21 @@ bot.action(/^color_(.+)/, (ctx) => {
   const userId = ctx.from.id;
   const color = ctx.match[1];
   getUserSettings(userId).fontColor = color;
-  ctx.reply(`Font color set to ${color}`);
+  ctx.reply(`✅ Font color set to ${color}`);
   showSettingsMenu(ctx);
   ctx.answerCbQuery();
 });
 
-bot.action('change_position', (ctx) => {
-  ctx.reply('Choose watermark position:', {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: 'Left', callback_data: 'pos_LEFT' }, { text: 'Center', callback_data: 'pos_CENTER' }, { text: 'Right', callback_data: 'pos_RIGHT' }]
-      ]
-    }
-  });
-  ctx.answerCbQuery();
-});
-
-bot.action(/^pos_(.+)/, (ctx) => {
+bot.action(/^position_(.+)/, (ctx) => {
   const userId = ctx.from.id;
-  const pos = ctx.match[1];
-  getUserSettings(userId).position = pos;
-  ctx.reply(`Watermark position set to ${pos}`);
+  const position = ctx.match[1];
+  getUserSettings(userId).position = position;
+  ctx.reply(`✅ Position set to ${position}`);
   showSettingsMenu(ctx);
   ctx.answerCbQuery();
 });
 
-// Handle text inputs for watermark and font size
+// Handle the text input for watermark text and font size
 bot.on('text', (ctx) => {
   const userId = ctx.from.id;
   const setting = ctx.session?.awaiting;
@@ -107,12 +133,12 @@ bot.on('text', (ctx) => {
 
   if (setting === 'text') {
     getUserSettings(userId).text = input;
-    ctx.reply(`Watermark text set to: ${input}`);
+    ctx.reply(`✅ Watermark text set to: "${input}"`);
   } else if (setting === 'size') {
     const size = parseInt(input);
     if (!isNaN(size)) {
       getUserSettings(userId).fontSize = size;
-      ctx.reply(`Font size set to: ${size}`);
+      ctx.reply(`✅ Font size set to: ${size}`);
     } else {
       ctx.reply('Invalid font size!');
     }
@@ -122,53 +148,62 @@ bot.on('text', (ctx) => {
   showSettingsMenu(ctx);
 });
 
-// On photo received
+// Handle photo uploads
 bot.on('photo', async (ctx) => {
   const userId = ctx.from.id;
   const settings = getUserSettings(userId);
 
-  try {
-    const photo = ctx.message.photo[ctx.message.photo.length - 1];
-    const fileId = photo.file_id;
-    const file = await ctx.telegram.getFile(fileId);
-    const url = `https://api.telegram.org/file/bot${BOT_TOKEN}/${file.file_path}`;
+  // 1. Show processing message
+  const waitMsg = await ctx.reply('⏳ Processing your image, please wait...');
 
-    const response = await axios({ url, responseType: 'arraybuffer' });
+  try {
+    const fileId = ctx.message.photo[ctx.message.photo.length - 1].file_id;
+    const fileUrl = await ctx.telegram.getFileLink(fileId);
+
+    const response = await axios.get(fileUrl.href, { responseType: 'arraybuffer' });
     const image = await Jimp.read(response.data);
 
-    // Load font based on color
-    let fontPath = Jimp[`FONT_SANS_32_${settings.fontColor}`] || Jimp.FONT_SANS_32_WHITE;
+    // Load font with user's selected settings
+    let fontPath;
+    try {
+      const style = settings.fontStyle || 'FONT_SANS';
+      const size = settings.fontSize || 32;
+      const color = settings.fontColor || 'WHITE';
+      fontPath = Jimp[`${style}_${size}_${color}`] || Jimp.FONT_SANS_32_WHITE;
+    } catch {
+      fontPath = Jimp.FONT_SANS_32_WHITE;
+    }
     const font = await Jimp.loadFont(fontPath);
 
-    const textWidth = Jimp.measureText(font, settings.text);
-    const textHeight = Jimp.measureTextHeight(font, settings.text, image.bitmap.width);
+    // Positioning logic
+    const text = settings.text || 'Watermark';
+    const textWidth = Jimp.measureText(font, text);
+    const textHeight = Jimp.measureTextHeight(font, text, image.bitmap.width);
 
-    let x = 20; // Left default
-    if (settings.position === 'CENTER') {
+    let x = 10, y = 10;
+    if (settings.position === 'center') {
       x = (image.bitmap.width - textWidth) / 2;
-    } else if (settings.position === 'RIGHT') {
-      x = image.bitmap.width - textWidth - 20;
+      y = (image.bitmap.height - textHeight) / 2;
+    } else if (settings.position === 'right') {
+      x = image.bitmap.width - textWidth - 10;
+      y = image.bitmap.height - textHeight - 10;
     }
 
-    const y = image.bitmap.height - textHeight - 20;
-    image.print(font, x, y, settings.text);
+    image.print(font, x, y, text);
 
-    const outputPath = 'watermarked.jpg';
-    await image.quality(90).writeAsync(outputPath);
+    const buffer = await image.getBufferAsync(Jimp.MIME_JPEG);
+    
+    // 2. Delete "processing" message
+    await ctx.deleteMessage(waitMsg.message_id);
 
-    await ctx.replyWithPhoto({ source: outputPath }, { caption: 'Here is your watermarked image.' });
-    fs.unlinkSync(outputPath);
+    // 3. Send watermarked image
+    await ctx.replyWithPhoto({ source: buffer }, { caption: '✅ Watermark added!' });
+
   } catch (error) {
     console.error(error);
-    ctx.reply('Failed to add watermark.');
+    await ctx.reply('❌ Failed to process image.');
   }
 });
 
-// Web server to keep Render alive
-const app = express();
-const PORT = process.env.PORT || 3000;
-app.get('/', (req, res) => res.send('Bot is running...'));
-app.listen(PORT, () => console.log(`Listening on port ${PORT}`));
-
-// Launch the bot
+// Start bot
 bot.launch();
