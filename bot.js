@@ -28,7 +28,7 @@ bot.on('photo', async (ctx) => {
     const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
 
     // Watermark settings
-    const watermarkText = 'YourWatermark'; // Change this to your watermark
+    const watermarkText = '@𝙎𝙠𝙮_𝙃𝙪𝙗4𝙪'; // Change this to your watermark
     const padding = 20;
 
     const textWidth = Jimp.measureText(font, watermarkText);
@@ -41,7 +41,7 @@ bot.on('photo', async (ctx) => {
     const bgY = image.bitmap.height - bgHeight - 20; // 20px above bottom
 
     // Create black transparent background
-    const background = new Jimp(bgWidth, bgHeight, 0x00000080); // black with transparency
+    const background = new Jimp(bgWidth, bgHeight, 000000); // black with transparency
     image.composite(background, bgX, bgY);
 
     // Print white text on top of background
