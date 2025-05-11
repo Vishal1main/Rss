@@ -27,18 +27,35 @@ bot.on('photo', async (ctx) => {
 
     const font = await Jimp.loadFont(Jimp.FONT_SANS_32_WHITE);
 
-    // Add watermark at bottom right
+    // Watermark settings
+    const watermarkText = 'YourWatermark'; // Change this to your watermark
+    const padding = 20;
+
+    const textWidth = Jimp.measureText(font, watermarkText);
+    const textHeight = Jimp.measureTextHeight(font, watermarkText, textWidth);
+
+    const bgWidth = textWidth + padding * 2;
+    const bgHeight = textHeight + padding * 2;
+
+    const bgX = (image.bitmap.width - bgWidth) / 2;
+    const bgY = image.bitmap.height - bgHeight - 20; // 20px above bottom
+
+    // Create black transparent background
+    const background = new Jimp(bgWidth, bgHeight, 0x00000080); // black with transparency
+    image.composite(background, bgX, bgY);
+
+    // Print white text on top of background
     image.print(
       font,
-      image.bitmap.width - 250,
-      image.bitmap.height - 50,
+      bgX + padding,
+      bgY + padding,
       {
-        text: 'YourWatermark', // Change this to your watermark
-        alignmentX: Jimp.HORIZONTAL_ALIGN_RIGHT,
-        alignmentY: Jimp.VERTICAL_ALIGN_BOTTOM
+        text: watermarkText,
+        alignmentX: Jimp.HORIZONTAL_ALIGN_CENTER,
+        alignmentY: Jimp.VERTICAL_ALIGN_MIDDLE
       },
-      240,
-      40
+      textWidth,
+      textHeight
     );
 
     const outputPath = 'watermarked.jpg';
